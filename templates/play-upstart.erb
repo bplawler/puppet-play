@@ -27,7 +27,6 @@ pre-start script
         test -c /dev/null || { stop; exit 0; }
         cd $PROJ_HOME
         rm $PROJ_HOME/server.pid || true
-        $PLAY_HOME/play dependencies $PROJ_HOME
 end script
 
 pre-stop exec $PLAY_HOME/play stop $PROJ_HOME
@@ -38,5 +37,5 @@ end script
 
 script
 cd $PROJ_HOME
-exec start-stop-daemon --start --exec $PLAY_HOME/play --chuid $USER:$GROUP -- start $PROJ_HOME  <%= frameworkId %> <%= javaOptions %>
+exec start-stop-daemon --start --exec $PLAY_HOME/play --chuid $USER:$GROUP -- start $PROJ_HOME --deps <%= frameworkId %> <%= javaOptions %>
 end script
