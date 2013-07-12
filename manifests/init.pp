@@ -13,6 +13,7 @@
 # *version* : the Play version to install
 #
 # Requires:
+# wget puppet module https://github.com/EslamElHusseiny/puppet-wget
 # A proper java installation and JAVA_HOME set
 # Sample Usage:
 #  include play
@@ -31,41 +32,55 @@
 #	require => [Jdk6["Java6SDK"], Play::Module["mongodb module"]]
 #  }
 #
-class play ($version = "1.2.3") {
-	
+class play ($version = "1.2.3", $install_path = "/opt") {
+
+	include wget
+
 	$play_version = $version
-	$play_path = "/opt/play-${play_version}"
+	$play_path = "${install_path}/play-${play_version}"
+	$download_url = $play_version ? {
+	  '2.1.0' => "http://downloads.typesafe.com/play/${play_version}/play-${play_version}.zip",
+	  default => "http://downloads.typesafe.com/releases/play-${play_version}.zip",
+	}
 	
 	notice("Installing Play ${play_version}")
-	exec { "download-play-framework":                                                                                                                     
-        command => "wget http://download.playframework.org/releases/play-${play_version}.zip",                                                         
-        cwd     => "/tmp",
-        creates => "/tmp/play-${play_version}.zip",                                                              
-		unless  => "test -d $play_path",
-		require => [Package["wget"]]
+        wget::fetch {'download-play-framework':
+          source      => "$download_url",
+          destination => "/tmp/play-${play_version}.zip",
+          timeout     => 0,
+        }
+
+    exec { "mkdir.play.install.path":
+        command => "/bin/mkdir -p ${install_path}",
+        unless  => "test -d ${install_path}"
     }
 
 	exec {"unzip-play-framework":
-	    cwd     => "/opt",
+	    cwd     => "${install_path}",
         command => "/usr/bin/unzip /tmp/play-${play_version}.zip",
         unless  => "test -d $play_path",
-        require => [ Package["unzip"], Exec["download-play-framework"] ],
+        require => [ Package["unzip"], Wget::Fetch["download-play-framework"], Exec["mkdir.play.install.path"] ],
 	}
 	
 	file { "$play_path/play":
-		ensure  => file,
+	    ensure  => file,
 	    owner   => "root",
 	    mode    => "0755",
-		require => [Exec["unzip-play-framework"]]
+	    require => [Exec["unzip-play-framework"]]
 	}
-	
-	package {
-	    "unzip":
-	        ensure => installed
+
+	file {'/usr/bin/play':
+	    ensure  => 'link',
+	    target  => "$play_path/play",
+	    require => File["$play_path/play"],
 	}
+
+    # Add a unversioned symlink to the play installation.
+    file { "${install_path}/play":
+        ensure => link,
+        target => $play_path,
+        require => Exec["mkdir.play.install.path", "unzip-play-framework"]
+    }
 	
-	package {
-	    "wget":
-	        ensure => installed
-	}	
+	if !defined(Package['unzip']){ package{"unzip": ensure => installed} }	
 }
